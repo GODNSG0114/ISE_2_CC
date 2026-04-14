@@ -1,0 +1,131 @@
+version: "3.9"
+
+# =============================================================================
+#  docker-compose.yml
+#  Docker-based Alternative Setup for Private Cloud (Microstack / Packstack)
+#  NOTE: This is a simulation/dev environment — not a full hardware-level cloud.
+#        For production use, run the Bash script on a real Ubuntu 22.04 VM.
+# =============================================================================
+
+services:
+
+  # ── Keystone — Identity Service ───────────────────────────────────────────
+  keystone:
+    image: openstackhelm/keystone:latest
+    container_name: openstack-keystone
+    environment:
+      - ADMIN_TOKEN=admin_token
+      - ADMIN_PASSWORD=admin
+      - DB_HOST=mariadb
+      - DB_PASSWORD=admin
+    ports:
+      - "5000:5000"
+      - "35357:35357"
+    depends_on:
+      - mariadb
+      - rabbitmq
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+  # ── Glance — Image Service ────────────────────────────────────────────────
+  glance:
+    image: openstackhelm/glance:latest
+    container_name: openstack-glance
+    environment:
+      - KEYSTONE_URL=http://keystone:5000
+      - DB_HOST=mariadb
+      - DB_PASSWORD=admin
+    ports:
+      - "9292:9292"
+    depends_on:
+      - keystone
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+  # ── Nova — Compute Service ────────────────────────────────────────────────
+  nova:
+    image: openstackhelm/nova:latest
+    container_name: openstack-nova
+    environment:
+      - KEYSTONE_URL=http://keystone:5000
+      - DB_HOST=mariadb
+      - DB_PASSWORD=admin
+      - RABBIT_HOST=rabbitmq
+      - RABBIT_PASSWORD=admin
+    ports:
+      - "8774:8774"
+    depends_on:
+      - keystone
+      - glance
+      - rabbitmq
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+  # ── Neutron — Networking Service ──────────────────────────────────────────
+  neutron:
+    image: openstackhelm/neutron:latest
+    container_name: openstack-neutron
+    environment:
+      - KEYSTONE_URL=http://keystone:5000
+      - DB_HOST=mariadb
+      - DB_PASSWORD=admin
+      - RABBIT_HOST=rabbitmq
+      - RABBIT_PASSWORD=admin
+    ports:
+      - "9696:9696"
+    depends_on:
+      - keystone
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+  # ── Horizon — Dashboard ───────────────────────────────────────────────────
+  horizon:
+    image: openstackhelm/horizon:latest
+    container_name: openstack-horizon
+    environment:
+      - KEYSTONE_URL=http://keystone:5000
+    ports:
+      - "80:80"
+    depends_on:
+      - keystone
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+  # ── MariaDB — Database Backend ────────────────────────────────────────────
+  mariadb:
+    image: mariadb:10.11
+    container_name: openstack-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=admin
+      - MYSQL_DATABASE=openstack
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+  # ── RabbitMQ — Message Queue ─────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: openstack-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Management UI
+    networks:
+      - openstack-net
+    restart: unless-stopped
+
+networks:
+  openstack-net:
+    driver: bridge
+
+volumes:
+  db-data:
