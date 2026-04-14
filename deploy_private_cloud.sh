@@ -273,7 +273,7 @@ run_stack() {
   echo ""
 
   # Run as 'stack' user; forward output to our log AND to terminal
-  sudo -u stack bash -c "cd ${DEVSTACK_DIR} && ./stack.sh" \
+  sudo -u stack bash -c "cd ${DEVSTACK_DIR} && FORCE=yes ./stack.sh" \
     2>&1 | tee -a "$LOG_FILE"
 
   success "stack.sh completed successfully!"
