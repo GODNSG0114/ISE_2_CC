@@ -175,10 +175,14 @@ clone_devstack() {
   local DEVSTACK_DIR="/opt/stack/devstack"
   info "Cloning DevStack repository …"
 
-  if [[ -d "$DEVSTACK_DIR/.git" ]]; then
+  if sudo -u stack test -d "$DEVSTACK_DIR/.git"; then
     warn "DevStack already cloned at ${DEVSTACK_DIR}.  Pulling latest …"
     sudo -u stack git -C "$DEVSTACK_DIR" pull --ff-only >> "$LOG_FILE" 2>&1 || true
   else
+    if sudo -u stack test -d "$DEVSTACK_DIR"; then
+      warn "Cleaning up incomplete DevStack clone at ${DEVSTACK_DIR} …"
+      sudo -u stack rm -rf "$DEVSTACK_DIR"
+    fi
     sudo -u stack git clone \
       --depth 1 \
       https://opendev.org/openstack/devstack.git \
